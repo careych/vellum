@@ -29,6 +29,12 @@ export async function Header() {
               >
                 Add link
               </a>
+              <a
+                href="/admin/export"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Export
+              </a>
               <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                 Admin
               </span>

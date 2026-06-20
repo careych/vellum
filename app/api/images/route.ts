@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
 import { deleteObject } from '@/lib/r2'
+import { ListParamsSchema, SaveImageBodySchema } from '@/lib/schemas'
 import { createClient } from '@/lib/supabase/server'
 import type { ImageItem } from '@/lib/types'
 
@@ -12,14 +13,11 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
 
-  const page = Math.max(0, parseInt(searchParams.get('page') ?? '0'))
-  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '30')))
-  const albumId = searchParams.get('album_id')
-  const q = searchParams.get('q')?.trim()
-  const tag = searchParams.get('tag')?.trim()
-  const from = searchParams.get('from')
-  const to = searchParams.get('to')
-  const sort = (searchParams.get('sort') ?? 'uploaded_desc') as SortOption
+  const parsed = ListParamsSchema.safeParse(Object.fromEntries(searchParams))
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 })
+  }
+  const { page, limit, album_id: albumId, q, tag, from, to, sort } = parsed.data
 
   // Tag pre-filter: resolve tag → image IDs before the main query
   let tagImageIds: string[] | null = null
@@ -108,26 +106,22 @@ export async function POST(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: {
-    r2_object_key?: string
-    thumbnail_key?: string | null
-    width?: number
-    height?: number
-    file_size?: number
-    mime_type?: string
-    taken_at?: string | null
-  }
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { r2_object_key, thumbnail_key, width, height, file_size, mime_type, taken_at } = body
-
-  if (!r2_object_key || !width || !height || !file_size || !mime_type) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const bodyParsed = SaveImageBodySchema.safeParse(rawBody)
+  if (!bodyParsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', issues: bodyParsed.error.issues },
+      { status: 400 }
+    )
   }
+
+  const { r2_object_key, thumbnail_key, width, height, file_size, mime_type, taken_at } = bodyParsed.data
 
   const { data, error } = await supabase
     .from('images')

@@ -1,6 +1,7 @@
 'use server'
 
 import { deleteObject } from '@/lib/r2'
+import { UpdateMetaSchema } from '@/lib/schemas'
 import { createClient } from '@/lib/supabase/server'
 
 export async function updateImageMetadata(
@@ -8,7 +9,7 @@ export async function updateImageMetadata(
   meta: {
     name: string
     note: string
-    albumId: string | null
+    albumId: string | null | undefined
     tags: string[]
     takenAt?: string | null
   }
@@ -19,19 +20,28 @@ export async function updateImageMetadata(
   } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // Validate all user-supplied strings before touching the database
+  const validated = UpdateMetaSchema.parse({
+    name: meta.name,
+    note: meta.note,
+    albumId: meta.albumId,
+    tags: meta.tags,
+    takenAt: meta.takenAt,
+  })
+
   const update: Record<string, unknown> = {
-    name: meta.name || null,
-    note: meta.note || null,
-    album_id: meta.albumId || null,
+    name: validated.name || null,
+    note: validated.note || null,
+    album_id: validated.albumId || null,
   }
-  if ('takenAt' in meta) update.taken_at = meta.takenAt || null
+  if ('takenAt' in meta) update.taken_at = validated.takenAt ?? null
 
   const { error: imgErr } = await supabase.from('images').update(update).eq('id', imageId)
   if (imgErr) throw imgErr
 
   await supabase.from('image_tags').delete().eq('image_id', imageId)
 
-  const cleanTags = meta.tags.map((t) => t.trim()).filter(Boolean)
+  const cleanTags = validated.tags.map((t) => t.trim()).filter(Boolean)
   if (cleanTags.length === 0) return
 
   await supabase

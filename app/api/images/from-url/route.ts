@@ -2,7 +2,9 @@ import { randomUUID } from 'crypto'
 import { type NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
 
+import { getClientIp, rateLimit } from '@/lib/ratelimit'
 import { deleteObject, getPublicUrl, uploadObject } from '@/lib/r2'
+import { FromUrlBodySchema } from '@/lib/schemas'
 import { createClient } from '@/lib/supabase/server'
 
 const MAX_SIZE = 100 * 1024 * 1024 // 100 MB
@@ -29,25 +31,34 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 }
 
 export async function POST(request: NextRequest) {
+  // ── Auth ─────────────────────────────────────────────────────────────────────
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: { url?: string; mode?: string }
+  // ── Rate limit: 20 imports per minute per IP ─────────────────────────────────
+  const ip = getClientIp(request.headers)
+  if (!rateLimit(`from-url:${ip}`, 20, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  // ── Validate body ────────────────────────────────────────────────────────────
+  let rawBody: unknown
   try {
-    body = await request.json()
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { url: rawUrl, mode } = body
-  if (!rawUrl?.trim()) return NextResponse.json({ error: 'url is required' }, { status: 400 })
-  if (mode !== 'reference' && mode !== 'import') {
-    return NextResponse.json({ error: 'mode must be "reference" or "import"' }, { status: 400 })
+  const parsed = FromUrlBodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Validation failed' },
+      { status: 400 }
+    )
   }
 
+  const { url: rawUrl, mode } = parsed.data
   const isDrive = rawUrl.includes('drive.google.com')
   const url = isDrive ? resolveGoogleDriveUrl(rawUrl.trim()) : rawUrl.trim()
 
