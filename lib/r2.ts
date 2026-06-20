@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // Module-level singleton — created once per server process, reused across requests.
@@ -33,6 +34,21 @@ export async function getPresignedUploadUrl(
     ContentType: contentType,
   })
   return getSignedUrl(r2, command, { expiresIn })
+}
+
+export async function uploadObject(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  )
 }
 
 export async function deleteObject(key: string): Promise<void> {
