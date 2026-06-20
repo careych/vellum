@@ -28,28 +28,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { fileName?: string; contentType?: string; fileSize?: number }
+  let body: { fileName?: string; contentType?: string; fileSize?: number; prefix?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { fileName, contentType, fileSize } = body
+  const { fileName, contentType, fileSize, prefix: rawPrefix } = body
+  const prefix = rawPrefix === 'thumbnails' ? 'thumbnails' : 'originals'
 
   if (!contentType || !ALLOWED_TYPES.has(contentType)) {
     return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
   }
 
-  if (!fileSize || fileSize <= 0 || fileSize > MAX_SIZE) {
+  const maxSize = prefix === 'thumbnails' ? 5 * 1024 * 1024 : MAX_SIZE
+  if (!fileSize || fileSize <= 0 || fileSize > maxSize) {
     return NextResponse.json(
-      { error: 'Invalid file size (max 100 MB)' },
+      { error: `Invalid file size (max ${prefix === 'thumbnails' ? '5' : '100'} MB)` },
       { status: 400 }
     )
   }
 
-  const ext = fileName?.split('.').pop()?.toLowerCase() ?? 'bin'
-  const key = `originals/${randomUUID()}.${ext}`
+  const ext = prefix === 'thumbnails' ? 'jpg' : (fileName?.split('.').pop()?.toLowerCase() ?? 'bin')
+  const key = `${prefix}/${randomUUID()}.${ext}`
 
   const presignedUrl = await getPresignedUploadUrl(key, contentType)
 
