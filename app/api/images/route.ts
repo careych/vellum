@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   let query: any = supabase
     .from('images')
     .select(
-      'id, name, taken_at, uploaded_at, thumbnail_key, r2_object_key, source_type, external_url, width, height, album_id, albums(name)',
+      'id, name, taken_at, uploaded_at, thumbnail_key, r2_object_key, source_type, external_url, width, height, album_id',
       { count: 'exact' }
     )
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     width: img.width,
     height: img.height,
     album_id: img.album_id,
-    album_name: img.albums?.name ?? null,
+    album_name: null,
   }))
 
   return NextResponse.json({

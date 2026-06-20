@@ -5,10 +5,12 @@ import { Gallery } from './_gallery'
 export default async function Home() {
   const supabase = await createClient()
 
-  const [{ data: { user } }, { data: albumsData }] = await Promise.all([
+  const [{ data: { user } }, albumsResult] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from('albums').select('id, name, cover_image_id').order('name'),
   ])
+  // cover_image_id column may not exist before the Phase 6 migration runs — fall back gracefully
+  const albumsData = albumsResult.error ? [] : albumsResult.data
 
   const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!
 

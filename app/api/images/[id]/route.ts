@@ -15,12 +15,23 @@ export async function GET(
   const { data: img, error } = await supabase
     .from('images')
     .select(
-      'id, name, note, taken_at, uploaded_at, thumbnail_key, r2_object_key, source_type, external_url, width, height, file_size, mime_type, album_id, albums(name)'
+      'id, name, note, taken_at, uploaded_at, thumbnail_key, r2_object_key, source_type, external_url, width, height, file_size, mime_type, album_id'
     )
     .eq('id', id)
     .single()
 
   if (error || !img) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Separate album lookup to avoid FK join ambiguity
+  let albumName: string | null = null
+  if (img.album_id) {
+    const { data: albumRow } = await supabase
+      .from('albums')
+      .select('name')
+      .eq('id', img.album_id)
+      .single()
+    albumName = albumRow?.name ?? null
+  }
 
   const { data: tagRows } = await supabase
     .from('image_tags')
@@ -51,7 +62,7 @@ export async function GET(
     file_size: row.file_size,
     mime_type: row.mime_type,
     album_id: row.album_id,
-    album_name: row.albums?.name ?? null,
+    album_name: albumName,
     tags,
   }
 
