@@ -16,7 +16,19 @@ export async function Header() {
           </a>
 
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <a
+                href="/upload"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Upload
+              </a>
+              <a
+                href="/add-from-link"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Add link
+              </a>
               <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                 Admin
               </span>
